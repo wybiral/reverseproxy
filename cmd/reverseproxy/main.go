@@ -34,13 +34,13 @@ func main() {
 	key := pbkdf2.Key([]byte(password), []byte(salt), rounds, 32, sha1.New)
 	// Create and start proxy server
 	proxyAddr := fmt.Sprintf("%s:%d", proxyHost, proxyPort)
-	p, err := reverseproxy.New(proxyAddr, targetAddr, key)
+	p, err := reverseproxy.New(targetAddr, key)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Target set to", targetAddr)
 	log.Println("Serving proxy at", proxyAddr)
-	err = p.Serve()
+	err = p.ListenAndServe(proxyAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
