@@ -13,7 +13,7 @@ import (
 	"net"
 )
 
-// A ReverseProxy stores everything needed to start serving.
+// A ReverseProxy stores everything needed to start serving to listeners.
 type ReverseProxy struct {
 	// Target address to proxy
 	targetAddr string
@@ -21,8 +21,8 @@ type ReverseProxy struct {
 	block cipher.Block
 }
 
-// Create a new ReverseProxy at proxyAddr that encrypts and proxies traffic to
-// the specified targetAddr using a shared key.
+// Create a new ReverseProxy at that encrypts and proxies traffic to the
+// specified targetAddr using a shared key.
 func New(targetAddr string, key []byte) (*ReverseProxy, error) {
 	// Create AES block from key
 	block, err := aes.NewCipher(key)
