@@ -20,7 +20,7 @@ func TestServe(t *testing.T) {
 	defer target.Close()
 	// Start the proxy
 	proxy := startProxy(t, key)
-	defer proxy.Shutdown()
+	defer proxy.Close()
 	// Delay for starting listeners
 	time.Sleep(time.Second)
 	client := startClient(t)
@@ -68,13 +68,17 @@ func startTarget(t *testing.T, key []byte) net.Listener {
 }
 
 // Start the proxy with a key
-func startProxy(t *testing.T, key []byte) *reverseproxy.ReverseProxy {
-	p, err := reverseproxy.New(proxyAddr, targetAddr, key)
+func startProxy(t *testing.T, key []byte) net.Listener {
+	ln, err := net.Listen("tcp", proxyAddr)
+	if err != nil {
+		t.Fatalf("proxy create listener error: %v", err)
+	}
+	p, err := reverseproxy.New(targetAddr, key)
 	if err != nil {
 		t.Fatalf("proxy create error: %v", err)
 	}
-	go p.Serve()
-	return p
+	go p.Serve(ln)
+	return ln
 }
 
 // Connect a TCP client to the proxy
