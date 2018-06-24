@@ -11,80 +11,54 @@ import (
 	"io"
 	"log"
 	"net"
-	"time"
 )
 
 // A ReverseProxy stores everything needed to start serving.
 type ReverseProxy struct {
-	// Address to serve proxy on
-	proxyAddr string
 	// Target address to proxy
 	targetAddr string
 	// AES block from key
 	block cipher.Block
-	// Channel for sending shutdown events
-	shutdownChan chan struct{}
-	// Timeout duration for listener between checking for shutdown signal.
-	// Default is 5 seconds.
-	ListenerTimeout time.Duration
 }
 
 // Create a new ReverseProxy at proxyAddr that encrypts and proxies traffic to
 // the specified targetAddr using a shared key.
-func New(proxyAddr, targetAddr string, key []byte) (*ReverseProxy, error) {
+func New(targetAddr string, key []byte) (*ReverseProxy, error) {
 	// Create AES block from key
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
 	p := &ReverseProxy{
-		proxyAddr:       proxyAddr,
-		targetAddr:      targetAddr,
-		block:           block,
-		shutdownChan:    make(chan struct{}),
-		ListenerTimeout: 5 * time.Second,
+		targetAddr: targetAddr,
+		block:      block,
 	}
 	return p, nil
 }
 
-// Start serving the reverse proxy. The target server will be sent an IV and
-// will be expected to send back an IV before any communication begins.
-func (p *ReverseProxy) Serve() error {
+// Create a new TCP listener and call the Serve method.
+func (p *ReverseProxy) ListenAndServe(addr string) error {
 	// Setup listener
-	addr, err := net.ResolveTCPAddr("tcp", p.proxyAddr)
-	if err != nil {
-		return err
-	}
-	ln, err := net.ListenTCP("tcp", addr)
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 	defer ln.Close()
+	return p.Serve(ln)
+}
+
+// Serve accepts incoming connections on the Listener ln, creating a new service
+// goroutine for each. The service goroutines proxy requests to the target
+// address and handle IV exchange and encrypted communications.
+func (p *ReverseProxy) Serve(ln net.Listener) error {
 	// Serve forever
 	for {
-		// Check for shutdown signal
-		select {
-		case <-p.shutdownChan:
-			return nil
-		default:
-		}
-		// Set deadline for listener
-		ln.SetDeadline(time.Now().Add(p.ListenerTimeout))
 		conn, err := ln.Accept()
-		opErr, ok := err.(*net.OpError)
-		if ok && opErr.Timeout() {
-			continue
-		}
 		if err != nil {
 			return err
 		}
 		go p.handleConnection(conn)
 	}
-}
-
-// Signal the reverse proxy server to shutdown.
-func (p *ReverseProxy) Shutdown() {
-	p.shutdownChan <- struct{}{}
 }
 
 // Handle each incoming connection.
